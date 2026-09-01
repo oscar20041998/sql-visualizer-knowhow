@@ -65,6 +65,27 @@ This script reads the intermediate JSON chunks, handles semantic embedding, and 
 3. **Batch SQL Generation:** Groups SQL insert queries into chunks of 5000 queries per file (`insert_chunks_part<X>.sql`) to keep file sizes manageable and avoid query execution timeouts.
 4. **Advanced DB Ingestion Support:** Formulates queries using `INSERT INTO document_chunks ... ON CONFLICT (id) DO UPDATE...` with explicit casting for Postgres `jsonb` (`::jsonb`) and pgvector (`::vector`).
 
+
+## Windows: Install pgvector
+
+### Step 1: Download a Prebuilt Windows Binary
+Visit one of these releases that provide compiled binaries:
+
+- **Link 1 (Recommended):** [andreiramani/pgvector_pgsql_windows Releases](https://github.com/andreiramani/pgvector_pgsql_windows/releases)
+- **Link 2:** Repo [portalcorp/pgvector_compiled Releases](https://www.google.com/search?q=https://github.com/portalcorp/pgvector_compiled/releases)
+
+Choose a version compatible with your PostgreSQL installation (for example, PostgreSQL 16), then download and extract the ZIP archive. The extracted folders contain the **`vector.dll`** file.
+
+### Step 2: Copy Files into PostgreSQL
+Copy the extracted files into your PostgreSQL installation directory (default: `C:\Program Files\PostgreSQL\16\`):
+
+1. The **`vector.dll`** file (from the `lib` folder):
+
+  $\rightarrow$ Copy to: `C:\Program Files\PostgreSQL\16\lib\`
+2. The **`vector.control`** and **`vector--*.sql`** files (from the `share\extension` folder):
+
+  $\rightarrow$ Copy to: `C:\Program Files\PostgreSQL\16\share\extension\`
+
 ---
 
 ## 🗄️ Recommended Database Schema
