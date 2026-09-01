@@ -61,9 +61,10 @@ This script loads the Markdown files generated inside the `markdown/` folder and
 ### Step 3: Compute Vector Embeddings & Export SQL (`scripts/2_generate_sql.py`)
 This script reads the intermediate JSON chunks, handles semantic embedding, and exports DB-ready SQL:
 1. **Load AI Model:** Downloads and spins up the `BAAI/bge-small-en-v1.5` model from Hugging Face.
-2. **Compute Embeddings:** Encodes the text of all chunks into multi-dimensional vectors using optimized batching.
-3. **Batch SQL Generation:** Groups SQL insert queries into chunks of 5000 queries per file (`insert_chunks_part<X>.sql`) to keep file sizes manageable and avoid query execution timeouts.
-4. **Advanced DB Ingestion Support:** Formulates queries using `INSERT INTO document_chunks ... ON CONFLICT (id) DO UPDATE...` with explicit casting for Postgres `jsonb` (`::jsonb`) and pgvector (`::vector`).
+2. **Clean and Validate Chunks:** Removes HTML comments and unsafe control characters, normalizes text, updates metadata lengths, and validates the required fields before embedding.
+3. **Compute Embeddings:** Encodes one SQL output batch at a time instead of retaining embeddings for the full corpus. It starts with an inference batch size of 16 and automatically retries with a smaller batch if PyTorch reports insufficient memory.
+4. **Batch SQL Generation:** Groups SQL insert queries into chunks of 5000 queries per file (`insert_chunks_part<X>.sql`) to keep file sizes manageable and avoid query execution timeouts. Progress is logged every 100 written chunks.
+5. **Advanced DB Ingestion Support:** Formulates queries using `INSERT INTO document_chunks ... ON CONFLICT (id) DO UPDATE...` with explicit casting for Postgres `jsonb` (`::jsonb`) and pgvector (`::vector`).
 
 
 ## Windows: Install pgvector
@@ -118,9 +119,33 @@ Open your Terminal or PowerShell in the root directory and install the necessary
 py -m pip install pypdf tqdm sentence-transformers
 ```
 
-> **Performance Tip:** If your machine has an NVIDIA GPU, installing a CUDA-enabled version of PyTorch is highly recommended to accelerate vector embedding computations.
+### 2. Optional: Authenticate with Hugging Face
+Authentication avoids anonymous Hugging Face Hub rate limits when downloading the embedding model. Create a read token at [Hugging Face Access Tokens](https://huggingface.co/settings/tokens), then set it for the current PowerShell session:
 
-### 2. Run the Scripts Sequentially
+```powershell
+$env:HF_TOKEN = "hf_your_token_here"
+```
+
+Do not store this token in source code or commit it to Git.
+
+### 3. Optional: Enable NVIDIA CUDA Acceleration
+Check whether the machine has a supported NVIDIA GPU:
+
+```powershell
+nvidia-smi
+```
+
+If available, install the CUDA-enabled PyTorch build:
+
+```powershell
+py -m pip uninstall torch torchvision torchaudio -y
+py -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+py -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No NVIDIA CUDA GPU')"
+```
+
+The final command must print `True` for CUDA acceleration to be used. Systems without an NVIDIA GPU run embeddings on CPU; for a large corpus, this can take a long time.
+
+### 4. Run the Scripts Sequentially
 
 #### Step A: Convert PDFs to Markdown
 ```powershell
@@ -138,4 +163,4 @@ py scripts/1_chunking.py
 ```powershell
 py scripts/2_generate_sql.py
 ```
-*Output:* Batch files named `insert_chunks_part1.sql`, `insert_chunks_part2.sql`, etc. will be written to the root directory. These files can be run directly in PostgreSQL via your preferred client (DBeaver, pgAdmin, or the `psql` CLI command).
+*Output:* Batch files named `insert_chunks_part1.sql`, `insert_chunks_part2.sql`, etc. will be written to the root directory. The console reports the current output file, embedding progress, and every 100 written chunks. These files can be run directly in PostgreSQL via your preferred client (DBeaver, pgAdmin, or the `psql` CLI command).
